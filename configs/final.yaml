@@ -1,0 +1,10 @@
+data:
+  drive_trades_glob: "/content/drive/MyDrive/Colab Notebooks/cryptoprice_prediction_tft/ETHUSDT-trades-data/*.parquet"
+  drive_onchain_glob: "/content/drive/MyDrive/Colab Notebooks/cryptoprice_prediction_tft/Ethereum_onchain_data/*.csv"
+
+  local_trades_dir: "data/raw/trades_parquet"
+  local_onchain_dir: "data/raw/onchain_csv"
+
+sync:
+  incremental: true
+  mirror: false
