@@ -24,10 +24,21 @@ def parse_args() -> argparse.Namespace:
         help="Optional run id suffix. If omitted, current timestamp is used.",
     )
     parser.add_argument(
+        "--config",
+        type=Path,
+        default=Path("configs/final.yaml"),
+        help="Path to pipeline config for the new default pipeline.",
+    )
+    parser.add_argument(
         "--command",
         type=str,
-        default="python scripts/final.py",
-        help="Pipeline command to execute.",
+        default=None,
+        help="Override command to execute. If omitted, default command is selected by --legacy.",
+    )
+    parser.add_argument(
+        "--legacy",
+        action="store_true",
+        help="Run legacy notebook-derived script (python scripts/final.py).",
     )
     parser.add_argument(
         "--dry_run",
@@ -46,11 +57,26 @@ def make_run_dir(output_root: Path, run_id: str | None) -> Path:
     return run_dir
 
 
+def default_command(args: argparse.Namespace, run_dir: Path) -> list[str]:
+    if args.command:
+        return shlex.split(args.command)
+    if args.legacy:
+        return ["python", "scripts/final.py"]
+    return [
+        "python",
+        "src/pipeline.py",
+        "--config",
+        str(args.config),
+        "--run_output_dir",
+        str(run_dir),
+    ]
+
+
 def main() -> None:
     args = parse_args()
     run_dir = make_run_dir(args.output_root, args.run_id)
 
-    command = shlex.split(args.command)
+    command = default_command(args, run_dir)
     env = os.environ.copy()
     env["RUN_OUTPUT_DIR"] = str(run_dir)
 
