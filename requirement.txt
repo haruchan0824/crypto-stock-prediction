@@ -20,3 +20,4 @@ hdbscan
 scipy
 joblib
 umap-learn
+ccxt
