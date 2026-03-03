@@ -1,0 +1,349 @@
+diff --git a/configs/pipeline_config.json b/configs/pipeline_config.json
+new file mode 100644
+index 0000000..a6d89a7
+--- /dev/null
++++ b/configs/pipeline_config.json
+@@ -0,0 +1,22 @@
++{
++  "df_diag_path": "TODO_df_diag.parquet",
++  "base_config_json": "TODO_base_config.json",
++  "cont_features_json": "TODO_cont_features.json",
++  "cat_features_json": "TODO_cat_features.json",
++
++  "regime_col": "regime_id",
++  "date_col": "date",
++  "valid_col": "valid_label",
++  "label_col": "target",
++
++  "train_span_days": 270,
++  "test_span_days": 30,
++  "min_train_rows": 110,
++  "min_test_rows": 40,
++
++  "num_epochs": 1,
++  "decoder_len": 1,
++
++  "strategy_type": null,
++  "eval_strategy_type": null
++}
+diff --git a/scripts/run_final.py b/scripts/run_final.py
+index 27bc99e..9923e09 100644
+--- a/scripts/run_final.py
++++ b/scripts/run_final.py
+@@ -26,8 +26,8 @@ def parse_args() -> argparse.Namespace:
+     parser.add_argument(
+         "--config",
+         type=Path,
+-        default=Path("configs/final.yaml"),
+-        help="Path to pipeline config for the new default pipeline.",
++        default=Path("configs/pipeline_config.json"),
++        help="Path to JSON pipeline config for the new default pipeline.",
+     )
+     parser.add_argument(
+         "--command",
+diff --git a/src/pipeline.py b/src/pipeline.py
+index 085a158..9e9a011 100644
+--- a/src/pipeline.py
++++ b/src/pipeline.py
+@@ -2,62 +2,19 @@
+ from __future__ import annotations
+ 
+ import argparse
+-import ast
+ import json
+ import os
+ from pathlib import Path
+ from typing import Any
+ 
+-
+ COMPARE_OUTPUT = "tft_vs_lgbm_compare.csv"
+ SUMMARY_OUTPUT = "tft_vs_lgbm_summary.json"
+-LOFO_GROUP_OUTPUT = "lofo_group_agg.csv"
+-LOFO_FEATURE_OUTPUT = "lofo_feature_agg.csv"
+ 
+ 
+ class PipelineInputError(RuntimeError):
+     pass
+ 
+ 
+-def read_simple_yaml(path: Path) -> dict[str, Any]:
+-    data: dict[str, Any] = {}
+-    current_section: str | None = None
+-    for raw in path.read_text(encoding="utf-8").splitlines():
+-        line = raw.strip()
+-        if not line or line.startswith("#"):
+-            continue
+-        if line.endswith(":") and ":" not in line[:-1]:
+-            current_section = line[:-1]
+-            data[current_section] = {}
+-            continue
+-        if ":" in line:
+-            k, v = line.split(":", 1)
+-            k = k.strip()
+-            v = v.strip().strip('"').strip("'")
+-            if v.lower() in ("true", "false"):
+-                parsed: Any = v.lower() == "true"
+-            else:
+-                parsed = _parse_scalar_or_literal(v)
+-            if current_section:
+-                section = data.setdefault(current_section, {})
+-                section[k] = parsed
+-            else:
+-                data[k] = parsed
+-    return data
+-
+-
+-def _parse_scalar_or_literal(raw: str) -> Any:
+-    raw = raw.strip()
+-    if raw == "":
+-        return ""
+-    if raw[0] in "[{(" and raw[-1] in "]})":
+-        try:
+-            return ast.literal_eval(raw)
+-        except (ValueError, SyntaxError):
+-            return raw
+-    return raw
+-
+-
+ def resolve_run_output_dir(run_output_dir: Path | None = None) -> Path:
+     env_dir = os.environ.get("RUN_OUTPUT_DIR")
+     resolved = Path(env_dir) if env_dir else (run_output_dir or Path("reports/raw/manual_run"))
+@@ -65,116 +22,108 @@ def resolve_run_output_dir(run_output_dir: Path | None = None) -> Path:
+     return resolved
+ 
+ 
++def _read_json(path: Path) -> Any:
++    if not path.exists():
++        raise PipelineInputError(f"JSON file not found: {path}")
++    with path.open("r", encoding="utf-8") as f:
++        return json.load(f)
++
++
+ def _load_dataframe(path: Path):
+     import pandas as pd
+ 
+     if not path.exists():
+         raise PipelineInputError(f"Input dataframe not found: {path}")
+-    if path.suffix.lower() == ".csv":
++    suffix = path.suffix.lower()
++    if suffix == ".csv":
+         return pd.read_csv(path)
+-    if path.suffix.lower() in {".parquet", ".pq"}:
++    if suffix in {".parquet", ".pq"}:
+         return pd.read_parquet(path)
+-    if path.suffix.lower() in {".pkl", ".pickle"}:
++    if suffix in {".pkl", ".pickle"}:
+         return pd.read_pickle(path)
+-    raise PipelineInputError(f"Unsupported dataframe extension: {path.suffix} ({path})")
++    raise PipelineInputError(f"Unsupported dataframe extension: {suffix} ({path})")
+ 
+ 
+ def _print_columns(df, label: str) -> None:
+     print(f"[INFO] Available columns ({label}): {list(df.columns)}")
+ 
+ 
+-def _pick_col(df, candidates: list[str], label: str) -> str:
+-    for c in candidates:
+-        if c in df.columns:
+-            return c
+-    _print_columns(df, label)
+-    raise PipelineInputError(f"Missing required columns for {label}: {candidates}")
+-
+-
+-def _aggregate_lofo(df, kind: str):
+-    import pandas as pd
+-
+-    name_candidates = ["group", "group_name", "setting", "setting_name"] if kind == "group" else [
+-        "feature",
+-        "feature_name",
+-        "setting",
+-        "setting_name",
++def _require_columns(df, columns: list[str], label: str) -> None:
++    missing = [c for c in columns if c not in df.columns]
++    if missing:
++        _print_columns(df, label)
++        raise PipelineInputError(f"Missing required columns for {label}: {missing}")
++
++
++def load_config(config_path: str) -> dict[str, Any]:
++    cfg = _read_json(Path(config_path))
++    required_keys = [
++        "df_diag_path",
++        "base_config_json",
++        "cont_features_json",
++        "cat_features_json",
++        "regime_col",
++        "date_col",
++        "valid_col",
++        "label_col",
++        "train_span_days",
++        "test_span_days",
++        "min_train_rows",
++        "min_test_rows",
++        "num_epochs",
++        "decoder_len",
+     ]
+-    delta_candidates = ["delta_auc", "auc_delta", "diff_auc", "delta_vs_full_mean", "delta_vs_full"]
+-
+-    name_col = _pick_col(df, name_candidates, f"lofo_{kind}")
+-    delta_col = _pick_col(df, delta_candidates, f"lofo_{kind}")
+-
+-    work = df[[name_col, delta_col]].copy()
+-    work = work.rename(columns={name_col: kind, delta_col: "delta_auc"})
+-    work["delta_auc"] = pd.to_numeric(work["delta_auc"], errors="coerce")
+-    out = (
+-        work.groupby(kind, as_index=False)["delta_auc"]
+-        .agg(["mean", "std", "count"])
+-        .reset_index()
+-        .rename(columns={"mean": "delta_auc_mean", "std": "delta_auc_std", "count": "n"})
+-        .sort_values("delta_auc_mean", ascending=False)
+-    )
+-    return out
+-
+-
+-def _require_pipeline_config(cfg: dict[str, Any]) -> dict[str, Any]:
+-    pipeline_cfg = cfg.get("pipeline")
+-    if not isinstance(pipeline_cfg, dict):
+-        raise PipelineInputError("Missing [pipeline] section in config. TODO: add pipeline.* keys to configs/final.yaml")
+-    return pipeline_cfg
+-
+-
+-def _load_base_config(pipeline_cfg: dict[str, Any]) -> dict[str, Any]:
+-    base_config_path = pipeline_cfg.get("base_config_json")
+-    if not base_config_path:
+-        raise PipelineInputError("Missing pipeline.base_config_json. TODO: set JSON path for TFT base config")
+-    p = Path(str(base_config_path))
+-    if not p.exists():
+-        raise PipelineInputError(f"base_config_json not found: {p}")
+-    return json.loads(p.read_text(encoding="utf-8"))
++    missing = [k for k in required_keys if k not in cfg]
++    if missing:
++        raise PipelineInputError(f"Missing required config keys: {missing}")
++    return cfg
+ 
+ 
+-def main(config_path: str = "configs/final.yaml", run_output_dir: Path | None = None) -> None:
+-    cfg_path = Path(config_path)
+-    if not cfg_path.exists():
+-        raise PipelineInputError(f"Config not found: {cfg_path}")
+-
+-    cfg = read_simple_yaml(cfg_path)
+-    pipeline_cfg = _require_pipeline_config(cfg)
++def main(config_path: str = "configs/pipeline_config.json", run_output_dir: Path | None = None) -> None:
++    cfg = load_config(config_path)
+     out_dir = resolve_run_output_dir(run_output_dir)
+ 
+     from src import legacy_core
+ 
+-    df_diag_path = pipeline_cfg.get("df_diag_path")
+-    if not df_diag_path:
+-        raise PipelineInputError("Missing pipeline.df_diag_path. TODO: provide df_diag CSV/Parquet path")
+-
+-    df_diag = _load_dataframe(Path(str(df_diag_path)))
+-    if "date" not in df_diag.columns:
+-        _print_columns(df_diag, "df_diag")
+-        raise PipelineInputError("df_diag must include 'date' column")
+-
+-    cont_features = pipeline_cfg.get("cont_features", getattr(legacy_core, "CONT_FEATURES_FOR_AUC", None))
+-    cat_features = pipeline_cfg.get("cat_features", getattr(legacy_core, "CAT_FEATURES_FOR_AUC", None))
++    df_diag = _load_dataframe(Path(cfg["df_diag_path"]))
++    date_col = str(cfg["date_col"])
++    valid_col = str(cfg["valid_col"])
++    label_col = str(cfg["label_col"])
++    _require_columns(df_diag, [date_col, valid_col, label_col], "df_diag")
++
++    base_config = _read_json(Path(cfg["base_config_json"]))
++    cont_features = _read_json(Path(cfg["cont_features_json"]))
++    cat_features = _read_json(Path(cfg["cat_features_json"]))
++    if not isinstance(base_config, dict):
++        raise PipelineInputError("base_config_json must contain a JSON object")
+     if not isinstance(cont_features, list) or not isinstance(cat_features, list):
+-        raise PipelineInputError("cont_features/cat_features are required lists (pipeline.cont_features / pipeline.cat_features)")
+-
+-    base_config = _load_base_config(pipeline_cfg)
++        raise PipelineInputError("cont_features_json/cat_features_json must contain JSON lists")
+ 
+-    # scripts/final.py の関数はグローバル変数参照があるため最低限注入（学習ロジックは変更しない）
++    # scripts/final.py の関数が参照するグローバルを注入（ロジック変更なし）
+     legacy_core.df_diag_v3 = df_diag
+     legacy_core.CONT_FEATURES_ALL = cont_features
+     legacy_core.CAT_FEATURES_ALL = cat_features
+     legacy_core.CONT_FEATURES_FOR_AUC = cont_features
+     legacy_core.CAT_FEATURES_FOR_AUC = cat_features
+ 
++    # scripts/final.py の実行例（5324付近）と同名引数で呼び出し
+     tft_results_df, _diag_df, _summary_df, fold_meta_df = legacy_core.regime_aware_wfa_with_tft(
+         df_diag=df_diag,
+         base_config=base_config,
++        regime_col=str(cfg["regime_col"]),
++        date_col=date_col,
++        valid_col=valid_col,
++        strategy_type=cfg.get("strategy_type"),
++        eval_strategy_type=cfg.get("eval_strategy_type"),
+         cont_features=cont_features,
+         cat_features=cat_features,
+-        device=str(pipeline_cfg.get("device", "cuda")),
++        train_span_days=int(cfg["train_span_days"]),
++        test_span_days=int(cfg["test_span_days"]),
++        min_train_rows=int(cfg["min_train_rows"]),
++        min_test_rows=int(cfg["min_test_rows"]),
++        num_epochs=int(cfg["num_epochs"]),
++        decoder_len=int(cfg["decoder_len"]),
++        label_col=label_col,
+     )
+ 
+     lgbm_results_df = legacy_core.run_lgbm_wfa_with_diagnostics(
+@@ -182,6 +131,9 @@ def main(config_path: str = "configs/final.yaml", run_output_dir: Path | None =
+         fold_meta_df=fold_meta_df,
+         cont_features=cont_features,
+         cat_features_base=cat_features,
++        label_col=label_col,
++        regime_col=str(cfg["regime_col"]),
++        eval_strategy_type=cfg.get("eval_strategy_type"),
+     )
+ 
+     comp_df, summary = legacy_core.fold_by_fold_tft_vs_lgbm(
+@@ -190,42 +142,16 @@ def main(config_path: str = "configs/final.yaml", run_output_dir: Path | None =
+         fold_meta_df=fold_meta_df,
+     )
+ 
+-    lofo_group_summary, _lofo_group_fold_delta, _lofo_group_raw = legacy_core.run_tft_group_lofo_ablation(
+-        df_diag=df_diag,
+-        fold_meta_df=fold_meta_df,
+-        cont_all=cont_features,
+-        cat_all=cat_features,
+-        base_config=base_config,
+-        device=str(pipeline_cfg.get("device", "cuda")),
+-    )
+-
+-    lofo_feature_summary, _lofo_feature_fold_delta, _lofo_feature_raw, _win_folds = legacy_core.run_tft_individual_lofo(
+-        df_diag=df_diag,
+-        fold_meta_df=fold_meta_df,
+-        cont_all=cont_features,
+-        cat_all=cat_features,
+-        base_config=base_config,
+-        device=str(pipeline_cfg.get("device", "cuda")),
+-    )
+-
+-    lofo_group_agg = _aggregate_lofo(lofo_group_summary, "group")
+-    lofo_feature_agg = _aggregate_lofo(lofo_feature_summary, "feature")
+-
+-    # 必須4成果物（RUN_OUTPUT_DIR直下）
+     comp_df.to_csv(out_dir / COMPARE_OUTPUT, index=False)
+     (out_dir / SUMMARY_OUTPUT).write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
+-    lofo_group_agg.to_csv(out_dir / LOFO_GROUP_OUTPUT, index=False)
+-    lofo_feature_agg.to_csv(out_dir / LOFO_FEATURE_OUTPUT, index=False)
+ 
+     print(f"[INFO] Saved: {out_dir / COMPARE_OUTPUT}")
+     print(f"[INFO] Saved: {out_dir / SUMMARY_OUTPUT}")
+-    print(f"[INFO] Saved: {out_dir / LOFO_GROUP_OUTPUT}")
+-    print(f"[INFO] Saved: {out_dir / LOFO_FEATURE_OUTPUT}")
+ 
+ 
+ def parse_args() -> argparse.Namespace:
+-    parser = argparse.ArgumentParser(description="Generate final pipeline artifacts")
+-    parser.add_argument("--config", type=str, default="configs/final.yaml")
++    parser = argparse.ArgumentParser(description="Generate Phase-A TFT vs LGBM artifacts")
++    parser.add_argument("--config", type=str, default="configs/pipeline_config.json")
+     parser.add_argument("--run_output_dir", type=Path, default=None)
+     return parser.parse_args()
