@@ -8,3 +8,16 @@ data:
 sync:
   incremental: true
   mirror: false
+
+pipeline:
+  # TODO: 学習入力 (df_diag) を parquet/csv/pickle で指定
+  df_diag_path: ""
+  # TODO: TFT の base_config(JSON) を指定
+  base_config_json: ""
+
+  # TODO: 必須特徴量（scripts/final.py のAUC用セットを移植して指定）
+  cont_features: []
+  cat_features: []
+
+  # optional
+  device: "cuda"
