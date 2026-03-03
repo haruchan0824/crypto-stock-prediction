@@ -4,7 +4,6 @@
 # In[ ]:
 
 
-get_ipython().system('pip install ccxt')
 import ccxt
 import pandas as pd
 import time
