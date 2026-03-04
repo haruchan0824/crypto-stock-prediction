@@ -4,7 +4,6 @@
 # In[ ]:
 
 
-get_ipython().system('pip install ccxt')
 import ccxt
 import pandas as pd
 import time
@@ -17,7 +16,15 @@ import features
 from scipy import stats
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from sklearn.model_selection import train_test_split
-from google.colab import drive
+
+def mount_drive_if_needed(mount_point: str = '/content/drive') -> bool:
+    """Mount Google Drive only when explicitly requested; no-op outside Colab."""
+    try:
+        from google.colab import drive  # type: ignore
+    except Exception:
+        return False
+    drive.mount(mount_point)
+    return True
 
 # データ取得関数
 def fetch_ohlcv_all(exchange, symbol, timeframe, since, limit=1000):
@@ -319,9 +326,6 @@ def process_eth_trades_data(input_folder, output_folder):
     Returns:
         pd.DataFrame: すべてのParquetファイルを結合したDataFrame。
     """
-
-    # Google Driveをマウント
-    drive.mount('/content/drive')
 
     # 出力フォルダが存在しなければ作成
     os.makedirs(output_folder, exist_ok=True)
