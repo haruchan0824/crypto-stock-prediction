@@ -19,4 +19,5 @@ seaborn
 hdbscan
 scipy
 joblib
+ccxt
 umap-learn
