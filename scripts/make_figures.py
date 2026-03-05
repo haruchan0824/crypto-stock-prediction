@@ -84,6 +84,22 @@ def load_csv_with_required_columns(path: Path, required_any: list[list[str]], la
     return df
 
 
+
+
+def safe_load_csv_with_required_columns(path: Path, required_any: list[list[str]], label: str) -> pd.DataFrame | None:
+    try:
+        df = load_csv_with_required_columns(path, required_any=required_any, label=label)
+    except Exception as e:
+        print(f"[WARN] Failed to load {label}: {e}")
+        return None
+    if df.empty:
+        print(f"[WARN] {label} is empty; using TODO fallback figure.")
+        return None
+    if "status" in df.columns and df["status"].astype(str).str.contains("TODO", case=False, na=False).all():
+        print(f"[WARN] {label} contains TODO-only rows; using TODO fallback figure.")
+        return None
+    return df
+
 def load_summary_json(path: Path) -> dict:
     with path.open("r", encoding="utf-8") as f:
         data = json.load(f)
@@ -232,15 +248,18 @@ def main() -> None:
 
     compare_df = None
     if compare_path:
-        compare_df = load_csv_with_required_columns(
+        compare_df = safe_load_csv_with_required_columns(
             compare_path,
             required_any=[["fold", "fold_id", "cv_fold"], ["lgbm_auc", "auc_lgbm"], ["tft_auc", "auc_tft"]],
             label="compare_csv",
         )
     if summary_path:
-        _ = load_summary_json(summary_path)
+        try:
+            _ = load_summary_json(summary_path)
+        except Exception as e:
+            print(f"[WARN] Failed to load summary_json: {e}")
     if lofo_group_path:
-        lofo_group_df = load_csv_with_required_columns(
+        lofo_group_df = safe_load_csv_with_required_columns(
             lofo_group_path,
             required_any=[["group", "group_name"], ["delta_auc", "auc_delta", "diff_auc"]],
             label="lofo_group_csv",
@@ -249,7 +268,7 @@ def main() -> None:
         lofo_group_df = None
 
     if lofo_feature_path:
-        lofo_feature_df = load_csv_with_required_columns(
+        lofo_feature_df = safe_load_csv_with_required_columns(
             lofo_feature_path,
             required_any=[["feature", "feature_name"], ["delta_auc", "auc_delta", "diff_auc"]],
             label="lofo_feature_csv",
@@ -257,11 +276,12 @@ def main() -> None:
     else:
         lofo_feature_df = None
 
-    if compare_df is None:
-        raise FileNotFoundError("compare CSV is required to generate fig03 and fig04 but was not found.")
-
-    plot_fig03_fold_auc(compare_df, output_dir / "fig03_fold_auc.png")
-    plot_fig04_auc_dist(compare_df, output_dir / "fig04_auc_dist.png")
+    if compare_df is not None:
+        plot_fig03_fold_auc(compare_df, output_dir / "fig03_fold_auc.png")
+        plot_fig04_auc_dist(compare_df, output_dir / "fig04_auc_dist.png")
+    else:
+        _save_todo_figure(output_dir / "fig03_fold_auc.png", "TODO: compare CSV not found/invalid for fig03.")
+        _save_todo_figure(output_dir / "fig04_auc_dist.png", "TODO: compare CSV not found/invalid for fig04.")
 
     if lofo_group_df is not None:
         plot_lofo_bar(lofo_group_df, output_dir / "fig05_lofo_group_delta_auc.png", "Group LOFO: ΔAUC by Group")
