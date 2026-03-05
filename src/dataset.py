@@ -12,7 +12,7 @@ import torch
 import numpy as np
 import glob
 import os
-import features
+from src import features
 from scipy import stats
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from sklearn.model_selection import train_test_split
