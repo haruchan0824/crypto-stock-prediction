@@ -7,25 +7,16 @@ Original file is located at
     https://colab.research.google.com/drive/1dGmw9dtdZhgwL000LRN9xQ3shoV0Ku2c
 """
 
-from google.colab import drive
-drive.mount('/content/drive')
 
 import os
+import sys
 
 # 移動したいディレクトリのパスを指定します
-target_directory = '/content/drive/My Drive/Colab Notebooks/cryptoprice_prediction_tft'
 
 # ディレクトリを変更します
-os.chdir(target_directory)
 
 # 現在のディレクトリを確認します (オプション)
-print(os.getcwd())
 
-!pip install yfinance scikit-learn --quiet
-!pip install ipdb --quiet
-!pip install mplfinance pytorch_lightning pytorch_forecasting timm requests fredapi optuna arch
-!pip install imbalanced-learn
-!pip install ta-lib
 
 import pandas as pd
 import torch
@@ -37,18 +28,16 @@ from sklearn.metrics import classification_report, confusion_matrix, roc_auc_sco
 import importlib
 importlib.invalidate_caches()
 # Remove the old features.py, model.py, dataset.py, optimization.py, filtering.py
-!rm -f features.py model.py dataset.py optimization.py filtering.py tft_model.py
 
 # Convert the notebooks to Python files
-!jupyter nbconvert --to python features.ipynb model.ipynb dataset.ipynb optimization.ipynb filtering.ipynb tft_model.ipynb
 
 # Import the converted Python files
-import features
-import model
-import dataset
-import optimization
-import filtering
-import tft_model # Import tft_model
+from src import features
+from src import model
+from src import dataset
+from src import optimization
+from src import filtering
+from src import tft_model  # Import tft_model
 
 # Reload the modules to ensure the latest changes are used
 importlib.reload(dataset)
@@ -60,6 +49,20 @@ importlib.reload(tft_model)
 
 import requests
 import pandas as pd
+
+
+def _keyerror_excepthook(exc_type, exc_value, exc_traceback):
+    if exc_type is KeyError:
+        print(f"[ERROR] KeyError: {exc_value}")
+        print("[ERROR] 利用可能カラム一覧:")
+        for name, val in sorted(globals().items()):
+            if isinstance(val, pd.DataFrame):
+                print(f"  - {name}: {list(val.columns)}")
+        return
+    sys.__excepthook__(exc_type, exc_value, exc_traceback)
+
+
+sys.excepthook = _keyerror_excepthook
 
 def get_fear_greed_index():
     """
@@ -558,8 +561,8 @@ if df_price is not None and not df_price.empty:
     df_onchain = dataset.get_onchain_data_multiple_queries(query_categories)
 
     #取引履歴データの取得
-    input_folder = '/content/drive/MyDrive/Colab Notebooks/cryptoprice_prediction_tft/ETHUSDT-trades-data'
-    output_folder = '/content/drive/MyDrive/Colab Notebooks/cryptoprice_prediction_tft/ETHUSDT-trades-data'
+    input_folder = 'data/raw/trades_parquet'
+    output_folder = os.environ.get('RUN_OUTPUT_DIR', 'reports/raw/manual_run')
     df_trades = dataset.process_eth_trades_data(input_folder, output_folder)
 
     # df_onchain
@@ -690,7 +693,7 @@ if df_price is not None and not df_price.empty:
 
 
 
-    # # output_folder = '/content/drive/MyDrive/Colab Notebooks/cryptoprice_prediction_tft'
+    # # output_folder = 'reports/raw/manual_run'
     # # file_path = os.path.join(output_folder, 'ETHUSDT_data.csv')
     # # df.to_csv(file_path)
 
@@ -1312,7 +1315,7 @@ rep_df, highcorr_df = audit_cont_features(df, CONT_FEATURES_ALL, train_mask)
 # rep_df.query("flags != ''").head(20)
 # highcorr_df.head(20)
 
-output_dir = '/content/drive/My Drive/Colab Notebooks/cryptoprice_prediction_tft/feature_audits'
+output_dir = os.path.join(os.environ.get('RUN_OUTPUT_DIR', 'reports/raw/manual_run'), 'feature_audits')
 os.makedirs(output_dir, exist_ok=True)
 
 file_path = os.path.join(output_dir, 'continuous_feature_audit.csv')
@@ -1453,7 +1456,7 @@ flag_cols = CAT_FEATURES_ALL
 audit = audit_flag_features_unsupervised(df, flag_cols)
 
 
-output_dir = '/content/drive/My Drive/Colab Notebooks/cryptoprice_prediction_tft/feature_audits'
+output_dir = os.path.join(os.environ.get('RUN_OUTPUT_DIR', 'reports/raw/manual_run'), 'feature_audits')
 os.makedirs(output_dir, exist_ok=True)
 
 file_path = os.path.join(output_dir, 'categorical_feature_audit.csv')
@@ -5384,7 +5387,6 @@ display(fold_meta_df[["fold_idx","train_start","train_end","test_start","test_en
 
 """# LightGBMによるregime-aware WFAの実行"""
 
-from __future__ import annotations
 
 import numpy as np
 import pandas as pd
@@ -9973,14 +9975,14 @@ else:
              # cl_params_subset = {
              #     'train_contrastive_learning_flag': True, # Set to True to train CL model
              #     'max_epochs_cl_train': 50, # Example: train for 50 epochs (adjust as needed)
-             #     # 'encoder_save_path': '/content/drive/MyDrive/Colab Notebooks/cryptoprice_prediction_tft/cnn_encoder_cl.pth', # Optional: save trained encoder
+             #     # 'encoder_save_path': 'reports/raw/manual_run/cnn_encoder_cl.pth', # Optional: save trained encoder
              #     # 'cl_augmentation_strategies': [...] # Optional: provide custom augmentations
              # }
 
              # Define DEC fine-tuning parameters (optional)
              dec_params_subset = {
                  'use_dec_finetuning': False, # Set to True to enable DEC fine-tuning (adjust as needed)
-                 # 'dec_save_path': '/content/drive/MyDrive/Colab Notebooks/cryptoprice_prediction_tft/dec_model.pth', # Optional: save DEC model
+                 # 'dec_save_path': 'reports/raw/manual_run/dec_model.pth', # Optional: save DEC model
                  # 'max_epochs_dec_train': 50, # Example DEC epochs
                  # 'dec_finetune_encoder': True # Set to True to finetune encoder during DEC
              }
@@ -10188,7 +10190,7 @@ import os
 
 # Define the path to save the clustering results
 # Using a path in Google Drive to persist the file
-output_folder_clustering = '/content/drive/MyDrive/Colab Notebooks/cryptoprice_prediction_tft/clustering_results'
+output_folder_clustering = os.path.join(os.environ.get('RUN_OUTPUT_DIR', 'reports/raw/manual_run'), 'clustering_results')
 os.makedirs(output_folder_clustering, exist_ok=True) # Create directory if it doesn't exist
 clustering_results_path = os.path.join(output_folder_clustering, 'clustered_data_by_strategy.joblib')
 
@@ -10205,7 +10207,7 @@ import pandas as pd
 import numpy as np
 
 # Define the path where the clustering results were saved
-clustering_results_path = '/content/drive/MyDrive/Colab Notebooks/cryptoprice_prediction_tft/clustering_results/clustered_data_by_strategy.joblib'
+clustering_results_path = os.path.join(output_folder_clustering, 'clustered_data_by_strategy.joblib')
 
 # Placeholder for the dictionary that will hold the loaded results
 clustered_data_by_strategy = None
@@ -15601,776 +15603,9 @@ strategy_name = 'Downtrend'
 file_path = f"loss_history_{strategy_name}.json"
 
 # JSONファイルを読み込み
-with open(file_path, "r") as f:lement will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
 
-Epoch 11/50, Training Loss: 0.6908
-Epoch 11/50, Validation Loss: 0.6835
-EarlyStopping: no improvement for 2 epoch(s).
-
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each element will be parsed individually, falling back to `dateutil`. To ensure parsing is consistent and as-expected, please specify a format.
-  dt = pd.to_datetime(s, errors="coerce", utc=True)
-/tmp/ipython-input-815280987.py:972: UserWarning: To copy construct from a tensor, it is recommended to use sourceTensor.detach().clone() or sourceTensor.detach().clone().requires_grad_(True), rather than torch.tensor(sourceTensor).
-  sample_weight = torch.tensor(sample_weight, dtype=torch.float32, device=device)
-/tmp/ipython-input-815280987.py:909: UserWarning: Could not infer format, so each
+# JSONファイルを読み込み
+with open(file_path, "r") as f:
     loss_history = json.load(f)
 
 train_loss = loss_history["train"]
@@ -17710,7 +16945,7 @@ if all_results_list:
     # display(results_df)
 
     # 結果をファイルに保存
-    output_folder_wf = '/content/drive/MyDrive/Colab Notebooks/cryptoprice_prediction_tft/walk_forward_results'
+    output_folder_wf = os.path.join(os.environ.get('RUN_OUTPUT_DIR', 'reports/raw/manual_run'), 'walk_forward_results')
     os.makedirs(output_folder_wf, exist_ok=True)
     results_path_csv = os.path.join(output_folder_wf, 'walk_forward_results.csv')
     results_path_joblib = os.path.join(output_folder_wf, 'walk_forward_results.joblib')

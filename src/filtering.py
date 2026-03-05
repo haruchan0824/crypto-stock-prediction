@@ -7354,8 +7354,6 @@ class CNNEncoder1D(nn.Module):
 # In[ ]:
 
 
-get_ipython().run_line_magic('pip', 'install pytorch-lightning')
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -8938,8 +8936,6 @@ class FocalLoss(nn.Module):
 
 # In[ ]:
 
-
-get_ipython().run_line_magic('pip', 'install pytorch-lightning')
 
 import torch
 import torch.nn as nn
