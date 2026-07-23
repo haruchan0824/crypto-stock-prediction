@@ -1,0 +1,22 @@
+{
+  "df_diag_path": "TODO_df_diag.parquet",
+  "base_config_json": "TODO_base_config.json",
+  "cont_features_json": "TODO_cont_features.json",
+  "cat_features_json": "TODO_cat_features.json",
+
+  "regime_col": "regime_id",
+  "date_col": "date",
+  "valid_col": "valid_label",
+  "label_col": "target",
+
+  "train_span_days": 270,
+  "test_span_days": 30,
+  "min_train_rows": 110,
+  "min_test_rows": 40,
+
+  "num_epochs": 1,
+  "decoder_len": 1,
+
+  "strategy_type": null,
+  "eval_strategy_type": null
+}
