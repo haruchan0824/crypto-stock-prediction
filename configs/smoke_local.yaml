@@ -1,0 +1,13 @@
+data:
+  input_path: data/raw/eth_1h.parquet
+  asset: ETH
+  timeframe: 1h
+  max_rows: 7500
+  timestamp_unit: null
+  strict_time_grid: false
+
+output:
+  root: reports/raw
+
+run:
+  seed: 42
