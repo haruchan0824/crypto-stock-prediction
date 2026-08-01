@@ -6,6 +6,9 @@ data:
   timestamp_unit: null
   strict_time_grid: false
 
+validation:
+  ohlc_consistency: warn
+
 output:
   root: reports/raw
 

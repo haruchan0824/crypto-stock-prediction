@@ -187,7 +187,14 @@ def _time_grid_profile(df: pd.DataFrame, timeframe: str) -> dict[str, Any]:
     }
 
 
-def _validate_ohlcv(df: pd.DataFrame) -> dict[str, Any]:
+def _validate_ohlcv(
+    df: pd.DataFrame,
+    *,
+    ohlc_consistency: str = "error",
+) -> dict[str, Any]:
+    if ohlc_consistency not in {"error", "warn"}:
+        raise ValueError("ohlc_consistency must be either 'error' or 'warn'.")
+
     converted = df.copy()
     for column in VALUE_COLUMNS:
         converted[column] = pd.to_numeric(converted[column], errors="coerce")
@@ -203,18 +210,62 @@ def _validate_ohlcv(df: pd.DataFrame) -> dict[str, Any]:
 
     non_positive_price = (converted[list(PRICE_COLUMNS)] <= 0).any(axis=1)
     negative_volume = converted["volume"] < 0
-    invalid_ohlc = (
-        (converted["high"] < converted["open"])
-        | (converted["high"] < converted["close"])
-        | (converted["high"] < converted["low"])
-        | (converted["low"] > converted["open"])
-        | (converted["low"] > converted["close"])
+    violation_labels = {
+        "high_lt_open": "high < open",
+        "high_lt_close": "high < close",
+        "low_gt_open": "low > open",
+        "low_gt_close": "low > close",
+        "high_lt_low": "high < low",
+    }
+    ohlc_violations = pd.DataFrame(
+        {
+            "high_lt_open": converted["high"] < converted["open"],
+            "high_lt_close": converted["high"] < converted["close"],
+            "low_gt_open": converted["low"] > converted["open"],
+            "low_gt_close": converted["low"] > converted["close"],
+            "high_lt_low": converted["high"] < converted["low"],
+        },
+        index=converted.index,
     )
+    invalid_ohlc = ohlc_violations.any(axis=1)
+    invalid_rows = converted.loc[
+        invalid_ohlc, ["date", "open", "high", "low", "close"]
+    ].copy()
+    if not invalid_rows.empty:
+        invalid_rows["violations"] = ohlc_violations.loc[invalid_ohlc].apply(
+            lambda row: ", ".join(
+                violation_labels[column] for column in row.index[row]
+            ),
+            axis=1,
+        )
+    invalid_sample = [
+        {
+            "date": record.date.isoformat(),
+            "open": float(record.open),
+            "high": float(record.high),
+            "low": float(record.low),
+            "close": float(record.close),
+            "violations": record.violations,
+        }
+        for record in invalid_rows.head(20).itertuples(index=False)
+    ]
 
     quality = {
         "missing_values_by_column": missing,
         "infinite_values_by_column": infinite,
+        "ohlc_consistency_policy": ohlc_consistency,
         "invalid_ohlc_rows": int(invalid_ohlc.sum()),
+        "invalid_ohlc_min_timestamp": (
+            invalid_rows["date"].min().isoformat() if not invalid_rows.empty else None
+        ),
+        "invalid_ohlc_max_timestamp": (
+            invalid_rows["date"].max().isoformat() if not invalid_rows.empty else None
+        ),
+        "invalid_ohlc_violation_counts": {
+            column: int(ohlc_violations[column].sum())
+            for column in ohlc_violations.columns
+        },
+        "invalid_ohlc_rows_sample": invalid_sample,
         "non_positive_price_rows": int(non_positive_price.sum()),
         "negative_volume_rows": int(negative_volume.sum()),
     }
@@ -224,7 +275,7 @@ def _validate_ohlcv(df: pd.DataFrame) -> dict[str, Any]:
         problems.append(f"missing values={missing}")
     if any(infinite.values()):
         problems.append(f"infinite values={infinite}")
-    if quality["invalid_ohlc_rows"]:
+    if quality["invalid_ohlc_rows"] and ohlc_consistency == "error":
         problems.append(f"invalid OHLC rows={quality['invalid_ohlc_rows']}")
     if quality["non_positive_price_rows"]:
         problems.append(
@@ -247,6 +298,7 @@ def load_local_ohlcv(
     timeframe: str,
     timestamp_unit: str | None = None,
     strict_time_grid: bool = False,
+    ohlc_consistency: str = "error",
 ) -> tuple[pd.DataFrame, dict[str, Any]]:
     """Load and strictly validate a local CSV or Parquet OHLCV file."""
     input_path = Path(path).expanduser().resolve()
@@ -279,7 +331,10 @@ def load_local_ohlcv(
             "Automatic aggregation is disabled."
         )
 
-    validation = _validate_ohlcv(normalized)
+    validation = _validate_ohlcv(
+        normalized,
+        ohlc_consistency=ohlc_consistency,
+    )
     validated = validation["data"]
     after_validation = int(len(validated))
     if max_rows is not None:

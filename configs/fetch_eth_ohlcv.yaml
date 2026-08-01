@@ -1,0 +1,22 @@
+data:
+  asset: ETH
+  quote: USD
+  timeframe: 1h
+  start: "2021-04-01T00:00:00Z"
+  end: "2024-12-31T00:00:00Z"
+  output_path: data/raw/eth_1h.parquet
+
+request:
+  api_key_env: CRYPTOCOMPARE_API_KEY
+  limit: 2000
+  timeout_seconds: 30
+  max_retries: 4
+  retry_backoff_seconds: 5
+  page_delay_seconds: 3
+
+validation:
+  ohlc_consistency: warn
+
+output:
+  metadata_path: data/raw/eth_1h.metadata.json
+  log_path: data/raw/eth_1h.fetch.log

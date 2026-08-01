@@ -106,6 +106,7 @@ def apply_cli_overrides(
     merged = {
         **config,
         "data": dict(config.get("data") or {}),
+        "validation": dict(config.get("validation") or {}),
         "output": dict(config.get("output") or {}),
         "run": dict(config.get("run") or {}),
     }
@@ -125,7 +126,7 @@ def apply_cli_overrides(
 
 
 def validate_config(config: dict[str, Any]) -> None:
-    for section in ("data", "output", "run"):
+    for section in ("data", "validation", "output", "run"):
         if not isinstance(config.get(section), dict):
             raise ValueError(f"Missing or invalid configuration section: {section}")
 
@@ -139,6 +140,11 @@ def validate_config(config: dict[str, Any]) -> None:
         raise ValueError("This pipeline phase supports timeframe='1h' only.")
     if int(config["data"]["max_rows"]) <= 0:
         raise ValueError("data.max_rows must be positive.")
+    ohlc_consistency = config["validation"].get("ohlc_consistency", "error")
+    if ohlc_consistency not in {"error", "warn"}:
+        raise ValueError(
+            "validation.ohlc_consistency must be either 'error' or 'warn'."
+        )
     if not config["output"].get("root"):
         raise ValueError("output.root must not be empty.")
 
@@ -234,6 +240,21 @@ def _log_profile(logger: logging.Logger, profile: dict[str, Any]) -> None:
         profile["time"]["maximum_interval"],
     )
     logger.info("Input fingerprint: %s", profile["input_file"])
+    quality = profile["quality"]
+    if (
+        quality["ohlc_consistency_policy"] == "warn"
+        and quality["invalid_ohlc_rows"]
+    ):
+        logger.warning(
+            "%d OHLC consistency violations found. Raw values are preserved; "
+            "no rows were dropped or corrected. min_timestamp=%s max_timestamp=%s "
+            "violation_counts=%s sample_first_20=%s",
+            quality["invalid_ohlc_rows"],
+            quality["invalid_ohlc_min_timestamp"],
+            quality["invalid_ohlc_max_timestamp"],
+            quality["invalid_ohlc_violation_counts"],
+            quality["invalid_ohlc_rows_sample"],
+        )
 
 
 def main() -> int:
@@ -270,6 +291,9 @@ def main() -> int:
             timeframe=str(config["data"]["timeframe"]),
             timestamp_unit=config["data"].get("timestamp_unit"),
             strict_time_grid=bool(config["data"].get("strict_time_grid", False)),
+            ohlc_consistency=str(
+                config["validation"].get("ohlc_consistency", "error")
+            ),
         )
         _write_json(run_dir / "data_profile.json", profile)
         _log_profile(logger, profile)
