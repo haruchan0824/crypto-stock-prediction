@@ -1,3 +1,6 @@
+pipeline:
+  stage: prepare
+
 data:
   input_path: data/raw/eth_1h.parquet
   asset: ETH
@@ -8,6 +11,19 @@ data:
 
 validation:
   ohlc_consistency: warn
+
+features:
+  implementation: pandas_v1
+
+label:
+  horizon_hours: 6
+  positive_rate: 0.20
+
+split:
+  train_days: 240
+  validation_days: 7
+  test_days: 30
+  max_folds: 1
 
 output:
   root: reports/raw

@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+import pandas as pd
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -22,6 +23,13 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from src.local_data import load_local_ohlcv
+from src.lgbm_pipeline import (
+    add_forward_return,
+    build_basic_features,
+    make_prepared_sample,
+    make_timestamp_folds,
+    prepare_fold_data,
+)
 
 
 def _utc_now() -> datetime:
@@ -36,7 +44,7 @@ def _json_default(value: Any) -> str:
     return str(value)
 
 
-def _write_json(path: Path, payload: dict[str, Any]) -> None:
+def _write_json(path: Path, payload: Any) -> None:
     path.write_text(
         json.dumps(payload, ensure_ascii=False, indent=2, default=_json_default) + "\n",
         encoding="utf-8",
@@ -105,7 +113,11 @@ def apply_cli_overrides(
 ) -> dict[str, Any]:
     merged = {
         **config,
+        "pipeline": dict(config.get("pipeline") or {}),
         "data": dict(config.get("data") or {}),
+        "features": dict(config.get("features") or {}),
+        "label": dict(config.get("label") or {}),
+        "split": dict(config.get("split") or {}),
         "validation": dict(config.get("validation") or {}),
         "output": dict(config.get("output") or {}),
         "run": dict(config.get("run") or {}),
@@ -126,7 +138,7 @@ def apply_cli_overrides(
 
 
 def validate_config(config: dict[str, Any]) -> None:
-    for section in ("data", "validation", "output", "run"):
+    for section in ("pipeline", "data", "validation", "output", "run"):
         if not isinstance(config.get(section), dict):
             raise ValueError(f"Missing or invalid configuration section: {section}")
 
@@ -147,6 +159,26 @@ def validate_config(config: dict[str, Any]) -> None:
         )
     if not config["output"].get("root"):
         raise ValueError("output.root must not be empty.")
+    stage = config["pipeline"].get("stage", "validate")
+    if stage not in {"validate", "prepare"}:
+        raise ValueError("pipeline.stage must be either 'validate' or 'prepare'.")
+    if stage == "prepare":
+        for section in ("features", "label", "split"):
+            if not isinstance(config.get(section), dict):
+                raise ValueError(
+                    f"Missing or invalid configuration section for prepare: {section}"
+                )
+        if config["features"].get("implementation") != "pandas_v1":
+            raise ValueError("features.implementation must be 'pandas_v1'.")
+        horizon = int(config["label"].get("horizon_hours", 0))
+        if horizon != 6:
+            raise ValueError("label.horizon_hours must be 6 in this phase.")
+        positive_rate = float(config["label"].get("positive_rate", 0))
+        if not 0 < positive_rate < 1:
+            raise ValueError("label.positive_rate must be between 0 and 1.")
+        for key in ("train_days", "validation_days", "test_days", "max_folds"):
+            if int(config["split"].get(key, 0)) <= 0:
+                raise ValueError(f"split.{key} must be positive.")
 
 
 def create_run_directory(config: dict[str, Any]) -> tuple[str, Path]:
@@ -257,6 +289,84 @@ def _log_profile(logger: logging.Logger, profile: dict[str, Any]) -> None:
         )
 
 
+def _run_prepare_stage(
+    data: pd.DataFrame,
+    *,
+    config: dict[str, Any],
+    run_dir: Path,
+    logger: logging.Logger,
+) -> None:
+    featured, feature_columns, feature_profile = build_basic_features(data)
+    horizon_hours = int(config["label"]["horizon_hours"])
+    prepared = add_forward_return(featured, horizon_hours=horizon_hours)
+    folds = make_timestamp_folds(
+        prepared["date"],
+        train_days=int(config["split"]["train_days"]),
+        validation_days=int(config["split"]["validation_days"]),
+        test_days=int(config["split"]["test_days"]),
+        max_folds=int(config["split"]["max_folds"]),
+    )
+
+    fold_rows: list[dict[str, Any]] = []
+    split_profiles: list[dict[str, Any]] = []
+    samples: list[pd.DataFrame] = []
+    for fold in folds.to_dict(orient="records"):
+        result = prepare_fold_data(
+            prepared,
+            fold,
+            feature_columns=feature_columns,
+            horizon_hours=horizon_hours,
+            positive_rate=float(config["label"]["positive_rate"]),
+        )
+        counts = result.profile["counts"]
+        splits = result.profile["splits"]
+        fold_rows.append(
+            {
+                **{key: fold[key] for key in folds.columns},
+                "n_train_before_purge": counts["n_train_before_purge"],
+                "n_train": counts["n_train"],
+                "n_validation_before_purge": counts[
+                    "n_validation_before_purge"
+                ],
+                "n_validation": counts["n_validation"],
+                "n_test_before_filter": counts["n_test_before_filter"],
+                "n_test": counts["n_test"],
+                "purged_train_rows": counts["purged_train_rows"],
+                "purged_validation_rows": counts["purged_validation_rows"],
+                "label_threshold": result.label_threshold,
+                "positive_rate_train": splits["train"]["positive_rate"],
+                "positive_rate_validation": splits["validation"]["positive_rate"],
+                "positive_rate_test": splits["test"]["positive_rate"],
+                "status": "prepared",
+            }
+        )
+        split_profiles.append(result.profile)
+        sample = make_prepared_sample(result, feature_columns=feature_columns)
+        sample.insert(0, "fold", int(fold["fold"]))
+        samples.append(sample)
+
+    _write_json(run_dir / "feature_profile.json", feature_profile)
+    _write_json(run_dir / "feature_columns.json", feature_columns)
+    pd.DataFrame(fold_rows).to_csv(run_dir / "folds.csv", index=False)
+    _write_json(
+        run_dir / "split_profile.json",
+        {
+            "horizon_hours": horizon_hours,
+            "positive_rate_target": float(config["label"]["positive_rate"]),
+            "folds": split_profiles,
+        },
+    )
+    pd.concat(samples, ignore_index=True).to_parquet(
+        run_dir / "prepared_sample.parquet", index=False
+    )
+    logger.info(
+        "Prepare stage completed: features=%d rows_after_warmup=%d folds=%d",
+        len(feature_columns),
+        len(featured),
+        len(folds),
+    )
+
+
 def main() -> int:
     args = parse_args()
     started_at = _utc_now()
@@ -285,7 +395,7 @@ def main() -> int:
         logger.info("Input file: %s", input_path)
         logger.info("Run directory: %s", run_dir)
 
-        _, profile = load_local_ohlcv(
+        data, profile = load_local_ohlcv(
             input_path,
             max_rows=int(config["data"]["max_rows"]),
             timeframe=str(config["data"]["timeframe"]),
@@ -299,6 +409,13 @@ def main() -> int:
         _log_profile(logger, profile)
         if profile["time"]["irregular_interval_count"]:
             logger.warning("Irregular 1-hour intervals were found; no rows were filled.")
+        if config["pipeline"].get("stage", "validate") == "prepare":
+            _run_prepare_stage(
+                data,
+                config=config,
+                run_dir=run_dir,
+                logger=logger,
+            )
 
         finished_at = _utc_now()
         metadata.update(
