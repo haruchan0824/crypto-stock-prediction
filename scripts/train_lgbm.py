@@ -118,13 +118,21 @@ def main() -> int:
         importances.append(result.feature_importance)
 
     test_metric_names = list(fold_metrics[0]["model"]["test"])
-    aggregate = {
+    aggregate_model = {
         name: {
             "mean": float(pd.Series([row["model"]["test"][name] for row in fold_metrics]).mean()),
             "std": float(pd.Series([row["model"]["test"][name] for row in fold_metrics]).std(ddof=0)),
         }
         for name in test_metric_names
     }
+    aggregate_baseline = {
+        name: {
+            "mean": float(pd.Series([row["constant_probability_baseline"]["test"][name] for row in fold_metrics]).mean()),
+            "std": float(pd.Series([row["constant_probability_baseline"]["test"][name] for row in fold_metrics]).std(ddof=0)),
+        }
+        for name in test_metric_names
+    }
+    aggregate = {"model": aggregate_model, "constant_probability_baseline": aggregate_baseline}
     write_json(run_dir / "metrics.json", {"folds": fold_metrics, "aggregate_test": aggregate})
     pd.concat(predictions, ignore_index=True).to_parquet(run_dir / "predictions.parquet", index=False)
     pd.concat(importances, ignore_index=True).to_csv(run_dir / "feature_importance.csv", index=False)
