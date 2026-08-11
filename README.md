@@ -37,9 +37,9 @@ legacy/                     Preserved Colab/notebook experiments and dependencie
 reports/raw/                Generated run artifacts (Git-ignored)
 ```
 
-Other `src/` modules, historical figures, and interview notes support the
-preserved earlier TFT-versus-LightGBM research and are not imported by the
-canonical pipeline.
+Historical figures and interview notes support the preserved earlier
+TFT-versus-LightGBM research; its source modules are under `legacy/src/` and
+are not imported by the canonical pipeline.
 
 ## Environment setup
 
