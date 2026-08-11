@@ -128,7 +128,9 @@ def get_onchain_data_multiple_queries(query_categories):
     # CSVファイルのディレクトリ
     csv_dir = "/content/drive/MyDrive/Colab Notebooks/cryptoprice_prediction_tft/Ethereum_onchain_data"
     # 🔑 Dune API キーを入力
-    API_KEY = "REDACTED_DUNE_API_KEY"  # ここにあなたのAPIキーを入力してください
+    API_KEY = os.environ.get("DUNE_API_KEY")
+    if not API_KEY:
+        raise RuntimeError("DUNE_API_KEY environment variable is required.")
     headers = {
         "X-Dune-Api-Key": API_KEY,
         "Content-Type": "application/json"

@@ -528,7 +528,7 @@ start_date = '2021-04-01'
 end_date = '2024-12-31'
 
 # 仮想通貨データの取得
-api_key = 'REDACTED_CRYPTOCOMPARE_API_KEY'
+api_key = os.environ.get("DUNE_API_KEY")
 
 # Add error handling for API call
 try:
@@ -592,7 +592,7 @@ if df_price is not None and not df_price.empty:
     df_funding = fetch_binance_funding_rate_range(symbol="ETHUSDT", days=2000)
 
     # 3. Global Liquidity Index（FRED）
-    fred_api_key = "REDACTED_FRED_API_KEY"
+    fred_api_key = os.environ.get("FRED_API_KEY")
     df_gli = build_global_liquidity_index(fred_api_key, start_date="2021-01-01")
     df_gli_clean = clean_gli(df_gli)
 
