@@ -350,7 +350,7 @@ def prepare_fold_data(
     ].copy()
     test = test_before.loc[
         test_before[forward_column].notna()
-        & (test_before["label_timestamp"] <= boundaries["test_end"])
+        & (test_before["label_timestamp"] < boundaries["test_end"])
     ].copy()
 
     if min(len(train), len(validation), len(test)) == 0:
@@ -378,8 +378,8 @@ def prepare_fold_data(
         raise ValueError("Train purge failed at train_end.")
     if validation["label_timestamp"].max() >= boundaries["validation_end"]:
         raise ValueError("Validation purge failed at validation_end.")
-    if test["label_timestamp"].max() > boundaries["test_end"]:
-        raise ValueError("Test label timestamp exceeds test_end.")
+    if test["label_timestamp"].max() >= boundaries["test_end"]:
+        raise ValueError("Test purge failed at test_end.")
     if set(train["date"]).intersection(validation["date"]):
         raise ValueError("Train and validation timestamps overlap.")
     if set(validation["date"]).intersection(test["date"]):

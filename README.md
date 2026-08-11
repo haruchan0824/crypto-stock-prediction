@@ -116,10 +116,10 @@ Verified on CPython 3.11.9 and LightGBM 4.7.0:
 
 | Test metric | LightGBM mean | Fold std | Constant baseline mean |
 |---|---:|---:|---:|
-| ROC-AUC | 0.5581 | 0.0457 | 0.5000 |
-| PR-AUC | 0.2402 | 0.0749 | 0.1948 |
-| LogLoss | 0.4952 | 0.1041 | 0.4932 |
-| Accuracy | 0.8002 | 0.0717 | 0.8052 |
+| ROC-AUC | 0.5581 | 0.0461 | 0.5000 |
+| PR-AUC | 0.2402 | 0.0750 | 0.1947 |
+| LogLoss | 0.4950 | 0.1042 | 0.4931 |
+| Accuracy | 0.8003 | 0.0717 | 0.8053 |
 | Precision | 0.1084 | 0.2047 | 0.0000 |
 | Recall | 0.0192 | 0.0397 | 0.0000 |
 | F1 | 0.0283 | 0.0532 | 0.0000 |
@@ -141,8 +141,8 @@ The canonical pipeline enforces the following:
 * no centered rolling windows, negative feature shifts, backfill, or global
   fold transformations are used;
 * forward returns match the exact timestamp at `t + 6h`, not a row offset;
-* train and validation boundary rows are purged when their label timestamp
-  crosses the split boundary;
+* train, validation, and test boundary rows are purged when their label
+  timestamp reaches or crosses the half-open split boundary;
 * each label threshold is fitted only on that fold's training returns;
 * LightGBM fits on train and early-stops only on validation;
 * test is accessed only after training/model selection and never tunes

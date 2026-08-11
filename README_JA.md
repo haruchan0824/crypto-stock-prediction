@@ -63,10 +63,10 @@ seed 42、1 thread、最大2,000 rounds、validation early stopping 100、判定
 
 | Test metric | LightGBM平均 | fold標準偏差 | 定数baseline平均 |
 |---|---:|---:|---:|
-| ROC-AUC | 0.5581 | 0.0457 | 0.5000 |
-| PR-AUC | 0.2402 | 0.0749 | 0.1948 |
-| LogLoss | 0.4952 | 0.1041 | 0.4932 |
-| Accuracy | 0.8002 | 0.0717 | 0.8052 |
+| ROC-AUC | 0.5581 | 0.0461 | 0.5000 |
+| PR-AUC | 0.2402 | 0.0750 | 0.1947 |
+| LogLoss | 0.4950 | 0.1042 | 0.4931 |
+| Accuracy | 0.8003 | 0.0717 | 0.8053 |
 | Precision | 0.1084 | 0.2047 | 0.0000 |
 | Recall | 0.0192 | 0.0397 | 0.0000 |
 | F1 | 0.0283 | 0.0532 | 0.0000 |
@@ -80,7 +80,7 @@ baselineを上回っておらず、production readyな結果ではありませ�
 
 特徴量はright-alignedな過去・現在情報だけを使い、centered rolling、未来shift、
 `bfill`、globalなfold変換を使いません。6時間先returnは行shiftではなく正確なtimestampで
-照合します。split境界を越えるlabel timestampはpurgeし、label閾値はfoldごとのtrainのみで
+照合します。half-open split境界に到達または越えるlabel timestampはpurgeし、label閾値はfoldごとのtrainのみで
 fitします。学習はtrainのみ、early stoppingはvalidationのみ、testは学習完了後の最終評価に
 だけ使用します。
 
